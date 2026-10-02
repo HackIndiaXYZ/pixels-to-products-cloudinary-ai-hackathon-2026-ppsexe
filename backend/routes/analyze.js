@@ -1,21 +1,60 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import cloudinary from '../config/cloudinary.js';
 import Project from '../models/Project.js';
 
 const router = express.Router();
 
-// PALAK: replace the body of this function with real analysis.
-// Must return { assetId, peopleCount, orientation, subjectPosition, background, suggestedRole }
+const ANALYSIS_TIMEOUT_MS = 2400;
+
+function fallbackBackground(photo) {
+  const hints = `${photo.assetId || ''} ${photo.url || ''}`.toLowerCase();
+  if (/street|road|city|urban/.test(hints)) return 'street';
+  if (/indoor|interior|room|studio|cafe/.test(hints)) return 'indoor';
+  return 'outdoor';
+}
+
 async function runAnalysis(photo, index) {
-  const orientation =
-    photo.width > photo.height ? 'landscape' : photo.width < photo.height ? 'portrait' : 'square';
+  const width = Number(photo.width) || 0;
+  const height = Number(photo.height) || 0;
+  const orientation = width > height ? 'landscape' : width < height ? 'portrait' : 'square';
+  let faces = [];
+  let peopleCount = 1;
+  let background = fallbackBackground(photo);
+
+  try {
+    const resource = await Promise.race([
+      cloudinary.api.resource(photo.assetId, { faces: true }),
+      new Promise((_, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Cloudinary analysis timed out')), ANALYSIS_TIMEOUT_MS);
+        timeout.unref?.();
+      }),
+    ]);
+    faces = Array.isArray(resource.faces) ? resource.faces : [];
+    peopleCount = faces.length;
+
+    const tags = Array.isArray(resource.tags) ? resource.tags.join(' ').toLowerCase() : '';
+    const hints = `${tags} ${resource.context?.custom?.background || ''}`.toLowerCase();
+    if (/street|road|city|urban/.test(hints)) background = 'street';
+    else if (/indoor|interior|room|studio|cafe/.test(hints)) background = 'indoor';
+    else if (/outdoor|nature|park|beach|garden/.test(hints)) background = 'outdoor';
+  } catch (error) {
+    console.warn(`Photo analysis fallback for ${photo.assetId}:`, error.message);
+  }
+
+  const faceCenterX = faces.length && width
+    ? faces.reduce((sum, face) => sum + (Number(face?.[0]) + Number(face?.[2]) / 2), 0) / faces.length
+    : width / 2;
+  const normalizedCenterX = width ? faceCenterX / width : 0.5;
+  const subjectPosition = normalizedCenterX < 1 / 3 ? 'left' : normalizedCenterX > 2 / 3 ? 'right' : 'center';
+
   return {
     assetId: photo.assetId,
-    peopleCount: null,
+    peopleCount,
     orientation,
-    subjectPosition: 'center',
-    background: null,
-    suggestedRole: index === 0 ? 'cover' : 'detail',
+    subjectPosition,
+    background,
+    suggestedRole: index === 0 ? 'cover' : orientation === 'landscape' ? 'full-width' : 'detail',
   };
 }
 

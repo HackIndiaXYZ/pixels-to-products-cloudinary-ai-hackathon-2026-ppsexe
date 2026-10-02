@@ -1,47 +1,21 @@
 import mongoose from 'mongoose';
 
 const photoSchema = new mongoose.Schema({
-  assetId: String,      // Cloudinary public_id
-  url: String,          // Cloudinary secure_url
+  assetId: String,
+  url: String,
   width: Number,
   height: Number,
   format: String,
-  analysis: {           // filled in by /analyze
-    peopleCount: Number,
-    orientation: String,
-    subjectPosition: String,
-    background: String,
-    suggestedRole: String,
-  },
-});
+}, { _id: false });
 
-const projectSchema = new mongoose.Schema(
-  {
-    userId: { type: String, default: 'guest' },
-    vibe: String,         // cute, natural, confident, romantic, cool, bold
-    peopleCount: String,  // solo, couple, friends, group
-    photos: [photoSchema],
-    poses: [
-      {
-        name: String,
-        imageUrl: String,
-        instructions: mongoose.Schema.Types.Mixed,
-      },
-    ],
-    board: [
-      {
-        assetId: String,
-        url: String,
-        role: String,     // cover, slide-2, ...
-      },
-    ],
-    status: {
-      type: String,
-      enum: ['created', 'uploaded', 'analyzed', 'composed'],
-      default: 'created',
-    },
-  },
-  { timestamps: true }
-);
+const projectSchema = new mongoose.Schema({
+  userId: String,
+  vibe: String,
+  peopleCount: String,
+  photos: [photoSchema],
+  poses: { type: Array, default: [] },
+  board: { type: Array, default: [] },
+  status: { type: String, default: 'created' },
+}, { timestamps: true });
 
 export default mongoose.model('Project', projectSchema);

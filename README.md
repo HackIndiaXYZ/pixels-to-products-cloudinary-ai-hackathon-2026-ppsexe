@@ -8,9 +8,9 @@ Built by team **PPS.exe** for the Cloudinary hackathon, **Track 2: Generative Co
 
 | | |
 |---|---|
-| Live demo | [TODO: add the frontend URL] |
+| Live demo | https://vybe-frontend-fce04t1bo-saakshi-singhs-projects-49a48e6a.vercel.app/ |
 | Backend API | https://vybe-95tw.onrender.com |
-| Demo video | [TODO: add the video link] |
+| Demo video | https://drive.google.com/file/d/18Gly9IQk3IgyeE5RZHysnNpzXxxUR-Z7/view?usp=sharing |
 
 > The backend runs on a free Render instance that sleeps when idle. The first request can take up to a minute to wake it up.
 

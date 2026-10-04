@@ -36,6 +36,11 @@ test('poses return three vibe-specific matches and optimized HTTPS URLs', () => 
     for (const { status, body } of responses) {
       assert.equal(status, 200);
       assert.equal(body.poses.length, 3);
+      const baseAssetIds = body.poses.map((pose) => {
+        const publicId = new URL(pose.imageUrl).pathname.split('/').at(-1);
+        return publicId.split('?')[0];
+      });
+      assert.equal(new Set(baseAssetIds).size, 3);
       assert.equal(new Set(body.poses.map((pose) => pose.instructions.expression)).size, 3);
       assert.equal(new Set(body.poses.map((pose) => pose.instructions.tip)).size, 3);
       assert.equal(new Set(body.poses.map((pose) => pose.instructions.pose.split(/(?<=[.!?])\s+/).at(-1))).size, 3);

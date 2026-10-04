@@ -49,6 +49,68 @@ function rewriteInstruction(base, lead) {
   return `${lead} ${base[0].toLowerCase()}${base.slice(1)}`;
 }
 
+function chooseDistinctVibePlans(groupPoses) {
+  const imageGroups = [...groupPoses.reduce((groups, poseDetails) => {
+    const group = groups.get(poseDetails.imagePublicId) || [];
+    group.push(poseDetails);
+    groups.set(poseDetails.imagePublicId, group);
+    return groups;
+  }, new Map()).values()];
+  const combinations = [];
+
+  function collectCombinations(nextGroup, poses) {
+    if (poses.length === 3) {
+      combinations.push(poses);
+      return;
+    }
+    for (let groupIndex = nextGroup; groupIndex < imageGroups.length; groupIndex += 1) {
+      for (const poseDetails of imageGroups[groupIndex]) {
+        collectCombinations(groupIndex + 1, [...poses, poseDetails]);
+      }
+    }
+  }
+
+  collectCombinations(0, []);
+  const rankedByVibe = new Map(VIBE_NAMES.map((vibe) => [
+    vibe,
+    combinations
+      .map((poseDetails) => ({
+        poseDetails,
+        matches: poseDetails.filter((pose) => pose.vibes.includes(vibe)).length,
+        tieBreak: Math.random(),
+      }))
+      .sort((a, b) => b.matches - a.matches || a.tieBreak - b.tieBreak),
+  ]));
+
+  let result;
+  function assignVibe(vibeIndex, usedSignatures, plans) {
+    if (vibeIndex === VIBE_NAMES.length) {
+      result = plans;
+      return true;
+    }
+
+    const vibe = VIBE_NAMES[vibeIndex];
+    for (const candidate of rankedByVibe.get(vibe)) {
+      const signature = candidate.poseDetails.map((pose) => pose.id).sort().join('|');
+      if (usedSignatures.has(signature)) continue;
+      plans.set(vibe, candidate.poseDetails.map((poseDetails) => ({ poseDetails })));
+      usedSignatures.add(signature);
+      if (assignVibe(vibeIndex + 1, usedSignatures, plans)) return true;
+      usedSignatures.delete(signature);
+      plans.delete(vibe);
+    }
+    return false;
+  }
+
+  if (combinations.length && assignVibe(0, new Set(), new Map())) return result;
+
+  return new Map(VIBE_NAMES.map((vibe) => [
+    vibe,
+    (rankedByVibe.get(vibe)?.[0]?.poseDetails || groupPoses.slice(0, 3))
+      .map((poseDetails) => ({ poseDetails })),
+  ]));
+}
+
 const POSES = {
   solo: [
     { id: 'solo-own-frame', name: 'Own-the-frame stance', groups: ['solo'], vibes: ['cute', 'romantic', 'confident'], imagePublicId: 'vybe/poses/solo-turn-back', instructions: { pose: 'Plant your feet comfortably, keep one knee soft, and turn your face toward the light.', hands: 'Lift one hand near your hair or glasses; let the other rest by your side.' } },
@@ -92,6 +154,10 @@ const POSES = {
   ],
 };
 
+const POSE_PLANS = Object.fromEntries(
+  Object.entries(POSES).map(([group, groupPoses]) => [group, chooseDistinctVibePlans(groupPoses)]),
+);
+
 // POST /poses  { vibe, peopleCount }
 router.post('/', (req, res) => {
   const vibe = String(req.body.vibe || '').toLowerCase();
@@ -103,10 +169,7 @@ router.post('/', (req, res) => {
     });
   }
 
-  const selected = POSES[group]
-    .map((poseDetails) => ({ poseDetails, match: poseDetails.vibes.includes(vibe), tieBreak: Math.random() }))
-    .sort((a, b) => Number(b.match) - Number(a.match) || a.tieBreak - b.tieBreak)
-    .slice(0, 3);
+  const selected = POSE_PLANS[group].get(vibe);
 
   const poses = selected.map(({ poseDetails }, poseIndex) => ({
     name: poseDetails.name,

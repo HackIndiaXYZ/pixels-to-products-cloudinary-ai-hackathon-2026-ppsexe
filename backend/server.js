@@ -10,6 +10,7 @@ import uploadRoute from './routes/upload.js';
 import analyzeRoute from './routes/analyze.js';
 import posesRoute from './routes/poses.js';
 import composeRoute from './routes/compose.js';
+import captionRoute from './routes/caption.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -26,6 +27,7 @@ app.use('/upload', uploadRoute);
 app.use('/analyze', analyzeRoute);
 app.use('/poses', posesRoute);
 app.use('/compose', composeRoute);
+app.use('/caption', captionRoute);
 
 if (process.env.MONGODB_URI) {
   mongoose.connect(process.env.MONGODB_URI)
